@@ -1,2 +1,2 @@
-# M-duloEstadisticaKeepcoding
+# ModuloEstadisticaKeepcoding
 Entrega módulo estadística Keepcoding 
