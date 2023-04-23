@@ -1,0 +1,516 @@
+---
+format: html
+editor: visual
+---
+
+```{r}
+#Importación librerías
+library(ggplot2)
+library("dslabs")
+```
+
+**Cargar los datos en un dataframe llamado: airbnb**
+
+```{r}
+airbnb<-read.csv('data//airbnb.csv',sep = ',', stringsAsFactors = T)
+```
+
+**Mostrar las primeras 6 filas del dataframe**
+
+```{r}
+head(airbnb,n=6)
+```
+
+**Renombrar las columnas de la siguiente forma:**
+
+| Nombre original        | Nuevo nombre   |
+|------------------------|----------------|
+| Zipcode                | CodigoPostal   |
+| Neighbourhood.Cleansed | Barrio         |
+| Property.Type          | TipoPropiedad  |
+| Room.Type              | TipoAlquiler   |
+| Accommodates           | MaxOcupantes   |
+| Bathrooms              | NumBanyos      |
+| Bedrooms               | NumDormitorios |
+| Beds                   | NumCamas       |
+| Bed.Type               | TipoCama       |
+| Amenities              | Comodidades    |
+| Square.Feet            | PiesCuadrados  |
+| Price                  | Precio         |
+| Review.Scores.Rating   | Puntuacion     |
+
+```{r}
+print(cat("Los nombre originales de las columnas son: ", paste0(colnames(airbnb), collapse = ",")))
+```
+
+```{r}
+#Renombramos las columnas
+colnames(airbnb) <-c("CodigoPostal","Barrio","TipoPropiedad","TipoAlquiler","MaxOcupantes","NumBanyos",
+"NumDormitorios","NumCamas","TipoCama","Comodidades","PiesCuadrados","Precio","Puntuacion")
+```
+
+```{r}
+cat("Los nombres modificados de las columnas son: ", paste0(colnames(airbnb), collapse = ","))
+```
+
+**Crea una nueva columna llamada MetrosCuadrados a partir de la columna PiesCuadrados.**
+
+Ayuda: 1 pie cuadrado son 0,092903 metros cuadrdados
+
+```{r}
+#Creamos la columna "MetrosCuadrados" a partir de "PiesCuadrados"
+airbnb$MetrosCuadrados <- airbnb$PiesCuadrados * 0.092903 
+```
+
+Miremos el código postal. Es una variable con entradas erróneas. Hay valores como '','-' y '28' que deberían ser considerados como NA. Así mismo también debería ser NA todos los que no compiencen por 28, ya que estamos con códigos postales de Madrid
+
+El código postal 28002, 28004 y 28051 tienen entradas repetidas. Por ejemplo las entradas 28002\n20882 deberían ir dnetro de 28002
+
+El codigo 2804 debería ser 28004, 2805 deberia ser 28005 y 2815 juncto con 2815 debería ser 28015
+
+**Limpia los datos de la columna Codigo Postal**
+
+```{r}
+#Antes de la limpieza
+cat("El listado de CodigoPostal antes de limpieza es: \n\n")
+airbnb$CodigoPostal |> table(useNA='always') |>  sort(decreasing = TRUE)|> data.frame() |> print.data.frame(row.names = FALSE)
+```
+
+```{r}
+#Limpieza de datos por la columna "Codigo Postal"
+airbnb[which(airbnb$CodigoPostal=="Madrid 28004"),'CodigoPostal'] <- "28004"
+airbnb[which(airbnb$CodigoPostal=="2815"),'CodigoPostal'] <- "28105"
+airbnb[which(airbnb$CodigoPostal==""),'CodigoPostal'] <- NA
+airbnb[which(airbnb$CodigoPostal=="-"),'CodigoPostal'] <- NA
+airbnb[which(airbnb$CodigoPostal=="28"),'CodigoPostal'] <- NA
+airbnb[which(airbnb$CodigoPostal=="28051\n28051"),'CodigoPostal'] <- "28051"
+airbnb[which(airbnb$CodigoPostal=="28002\n28002"),'CodigoPostal'] <- "28002"
+airbnb[which(airbnb$CodigoPostal=="2804"),'CodigoPostal'] <- "28040"
+airbnb[which(airbnb$CodigoPostal=="2805"),'CodigoPostal'] <- "28050"
+airbnb[which(airbnb$CodigoPostal=="280013"),'CodigoPostal'] <- "28013"
+airbnb[!grepl("^28\\d{3}$",airbnb$CodigoPostal), "CodigoPostal"] <- NA
+
+
+##Actualizamos factor para no incluir valores modificados
+airbnb$CodigoPostal <- factor(airbnb$CodigoPostal)
+```
+
+```{r}
+cat("El listado de CodigoPostal después de limpieza es: \n\n")
+airbnb$CodigoPostal |> table(useNA='always') |> sort(decreasing = TRUE) |> data.frame() |> print.data.frame(row.names = FALSE) 
+```
+
+**Una vez limpios los datos ¿Cuales son los códigos postales que tenemos?**
+
+```{r}
+cat("Hay ", length(unique(airbnb$CodigoPostal)), " codigos postales distintos y son :",paste(unique(airbnb$CodigoPostal), collapse = ","),"\n")
+```
+
+**¿Cuales son los 5 códigos postales con más entradas? ¿Y con menos? ¿Cuantas entradas tienen?**
+
+```{r}
+tabla_frecuencias <- table(airbnb$CodigoPostal) |> sort(decreasing = TRUE) |> as.data.frame()
+colnames(tabla_frecuencias) <- c("Barrio","Entradas")
+
+cat("Los 5 códigos postales con más entradas son: \n\n")
+
+print.data.frame(tabla_frecuencias[1:5,],row.names = FALSE)
+
+cat("\nLos 5 códigos postales con menos entradas son: \n\n")
+
+tabla_frecuencias <- tabla_frecuencias[order(tabla_frecuencias$Entradas),]
+
+print.data.frame(tabla_frecuencias[1:5,],row.names = FALSE)
+
+```
+
+**¿Cuales son los barrios que hay en el código postal 28012?**
+
+```{r}
+barrios_cp_28012 <- unique(airbnb[which(airbnb$CodigoPostal == "28012"), "Barrio"])
+
+cat("Los barrios que hay en el código postal 28012 son : \n", paste0(barrios_cp_28012,collapse=","))
+```
+
+**¿Cuantas entradas hay en cada uno de esos barrios para el codigo postal 28012?**
+
+```{r}
+entradas_barrios_cp_28012 <- table(droplevels(airbnb[which(airbnb$CodigoPostal == "28012"), "Barrio"])) |> sort(decreasing = TRUE) |> as.data.frame() 
+colnames(entradas_barrios_cp_28012) <- c("Barrio","Entradas")
+cat("El codigo postal 28012 tienes por barrios las siguientes entradas: \n\n")
+
+print.data.frame(entradas_barrios_cp_28012,row.names = FALSE)
+```
+
+**¿Cuantos barrios hay en todo el dataset airbnb? ¿Cuales son?**
+
+```{r}
+# Obtener los barrios únicos del dataset airbnb
+barrios_unicos <- unique(airbnb$Barrio)
+
+cat("El dataset airbnb tienes: ", length(barrios_unicos), " barrios únicos \nLista de barrios únicos:\n",paste(barrios_unicos, collapse = ","),"\n")
+```
+
+**¿Cuales son los 5 barrios que tienen mayor número entradas?**
+
+```{r}
+barrios_aparicion <- table(airbnb$Barrio)|> sort(decreasing = TRUE)|> as.data.frame()
+colnames(barrios_aparicion) <- c("Barrio","Entradas")
+
+# Mostrar los 5 barrios con mayor número de entradas
+cat("Los 5 barrios con mayor número de entradas en el dataset airbnb son:\n\n")
+print.data.frame(barrios_aparicion[1:5,],row.names = FALSE)
+```
+
+**¿Cuantos Tipos de Alquiler diferentes hay? ¿Cuales son? ¿Cuantas entradas en el dataframe hay por cada tipo?**
+
+```{r}
+# Contar el número de entradas por cada tipo de alquiler utilizando la función length en table
+tipos_alquiler <- unique(airbnb$TipoAlquiler)
+tipos_alquiler_entradas  <- table(airbnb$TipoAlquiler)|> sort( decreasing = TRUE)|> as.data.frame()
+colnames(tipos_alquiler_entradas) <- c("Tipo apartamento","Entradas")
+
+cat("Hay ",length(tipos_alquiler)," tipos de alquiler diferentes. \n\nLos tipos de  alquileres son :",paste(tipos_alquiler,collapse=" , "),"\n\nLa entradas que hay por cada tipo de alquiler son: \n\n")
+
+print.data.frame(tipos_alquiler_entradas,row.names=FALSE)
+```
+
+**Muestra el diagrama de cajas del precio para cada uno de los diferentes Tipos de Alquiler**
+
+```{r}
+# Cargar la librería necesaria para el gráfico de cajas
+library(ggplot2)
+
+#Generar el diagrama de cajas por tipo de alquiler y de cada color pintamos el tipo de alquiler.
+ggplot(data=airbnb, aes(x=TipoAlquiler, y=Precio, color=TipoAlquiler))+geom_boxplot(na.rm = TRUE)
+```
+
+**Cual es el precio medio de alquiler de cada uno, la diferencia que hay ¿es estadísticamente significativa? ¿Con que test lo comprobarías?**
+
+```{r}
+tipos_alquiler <-unique(airbnb["TipoAlquiler"])
+for(alquiler in t(tipos_alquiler)){
+  cat("El precio medio de alquiler en ", alquiler ," es: " , mean(airbnb[which(airbnb$TipoAlquiler == alquiler),"Precio"],na.rm=TRUE) ,"\n")
+}
+```
+
+Para comprobar si son estadísticamente significativas hay que hacer los siguientes pasos:
+
+Como tenemos 3 tipos de alquiler distintos , primero tenemos que comprobar si siguen una distribución gaussiana y para ello tenemos que realizarle a cada tipo de alquiler el Shapiro-Wilk. No podemos usar t de Student porque es solo para dos grupos.
+
+Las hipótesis que seguiremos para cada una de ellas será:
+
+$H_0$: La variable presenta una distribución normal
+
+$H_1$: La variable presenta una distribución no normal
+
+La decisión que tomaremos después de aplicar el test Shapiro será:
+
+p-valor \> 0.05 No rechazar H0 (El tipo de alquiler presenta una distribución normal)
+
+p-valor \< 0.05 Rechazar H0 (El tipo de alquiler no presenta una distribución normal)
+
+```{r}
+for(alquiler in levels(airbnb$TipoAlquiler)){
+  precios_alquiler <- airbnb$Precio[airbnb$TipoAlquiler==alquiler]
+  if(length(precios_alquiler)>5000){
+    #El test de Shapiro en R solo funciona si hay entre 3 y 5000 entradas , por lo cual si en el caso que haya mas de 5000 entradas hay que hacer un sample para obtener solo 5000
+    precios_alquiler<- sample(precios_alquiler,5000, replace = TRUE)
+  }
+  cat("Tipo alquiler ",alquiler," p-value = " ,shapiro.test(precios_alquiler)$p.value,"\n")
+}
+```
+
+Como el p valor es menor que 0.05 en los tres casos se rechaza la hipótesis nula (H0), por lo tanto, los precios según el tipo de alquiler no sigue una distribución normal.
+
+Ya que sabemos que no siguen la misma distribución gaussiana procederemos a usar el test para aquellos grupos que no siguen la misma distribución y es el Kruskal-Wallis . No usaremos ANOVA test Welch porque no siguen una distribución gaussiana.
+
+Las hipótesis que seguiremos para cada una de ellas será:
+
+$H_0$: Los tipos de alquiler tienen misma media.
+
+$H_1$: Los tipos de alquiler tienen diferente media al menos unos de ellos.
+
+La decisión que tomaremos después de aplicar el test Shapiro será:
+
+p-valor \> 0.05 No rechazar H0 (tomas las medias son similares)
+
+p-valor \< 0.05 Rechazar H0 (hay al menos una que no es similar a las demás)
+
+```{r}
+kruskal.test(Precio ~ TipoAlquiler, data=airbnb)
+```
+
+Como el p-valor (2e-16) nos da muy inferior a 0.05 podemos rechazar la hipótesis nula H0 , por lo tanto, los precios según el tipo de alquiler hay al menos uno que no tiene la misma media.
+
+**Filtra el dataframe cuyos tipo de alquiler sea 'Entire home/apt' y guardalo en un dataframe llamado *airbnb_entire*. Estas serán las entradas que tienen un alquiler del piso completo.**
+
+```{r}
+airbnb_entire <-airbnb[which(airbnb$TipoAlquiler == "Entire home/apt"), ] 
+```
+
+**¿Cuales son los 5 barrios que tienen un mayor número de apartamentos enteros en alquiler? Nota: Mirar solo en airbnb_entire. A partir de este punto y hasta que se diga lo contrario partiremos de airbnb_entire.**
+
+```{r}
+barrios_por_entradas<- table(airbnb_entire$Barrio)|> sort(decreasing = TRUE)|> as.data.frame()
+colnames(barrios_por_entradas) <-c("Barrio","Entradas")
+cat("Los 5 barrios que tienen un mayor número de apartamentos enteros en alquiler son: \n\n")
+print.data.frame(barrios_por_entradas[1:5,],row.names=FALSE)
+```
+
+**¿Cuales son los 5 barrios que tienen un mayor precio medio de alquiler para apartamentos enteros (es decir, del dataframe airbnb_entire)?**
+
+```{r}
+barrios_por_precio_medio <- aggregate(Precio ~ Barrio, FUN = mean, data = airbnb_entire)
+barrios_por_precio_medio <- barrios_por_precio_medio[order(-barrios_por_precio_medio$Precio),]
+cat("Los 5 barrios que tienen un mayor precio medio de alquiler para apartamentos enteros son: \n\n")
+print.data.frame(barrios_por_precio_medio[1:5,c("Barrio","Precio")],row.names = FALSE)
+```
+
+**¿Cuantos apartamentos hay en cada uno de esos barrios?**
+
+```{r}
+vector_barrios_precio_medio <- barrios_por_precio_medio[1:5, "Barrio"]
+```
+
+```{r}
+top_5_precio_medio <- subset(airbnb_entire, Barrio %in% vector_barrios_precio_medio) 
+top_5_precio_medio <- table(droplevels(top_5_precio_medio$Barrio)) |> sort(decreasing = TRUE)|> as.data.frame()
+colnames(top_5_precio_medio) <-c("Barrio","Entradas")
+
+cat("En cada uno de esos barrios con mayor precio medio por barrio hay:\n\n")
+print.data.frame(top_5_precio_medio[1:5,],row.names=FALSE)
+
+```
+
+**Mostrar una dataframe con el nombre del barrio, el precio y el número de entradas.**
+
+Ayuda: Podeis crear un nuevo dataframe con las columnas "Barrio" y "Freq" que contenga el número de entradas en cada barrio y hacer un merge con el dataframe del punto anterior.
+
+```{r}
+barrio_resumen <- merge(barrios_por_precio_medio,barrios_por_entradas, by = "Barrio",all=TRUE)
+barrio_resumen$Precio <- round(barrio_resumen$Precio,2)
+colnames(barrio_resumen) <- c("Barrio","Precio","Entradas")
+
+cat("Dataframe con nombre de barrio, precio medio y número de entradas :\n\n")
+
+barrio_resumen
+```
+
+**Partiendo del dataframe anterior, muestra los 5 barrios con mayor precio, pero que tengan más de 100 entradas de alquiler.**
+
+```{r}
+top_5_mayor_precio_mas_100_entrada <- subset(barrio_resumen,Entradas >= 100)
+
+top_5_mayor_precio_mas_100_entrada <- top_5_mayor_precio_mas_100_entrada[order(-top_5_mayor_precio_mas_100_entrada$Precio),]
+
+vector_100_entradas <- top_5_mayor_precio_mas_100_entrada[1:5,"Barrio"]
+
+cat("Los 5 barrios con mayor precio medio de alquiler son:\n\n")
+
+print.data.frame(top_5_mayor_precio_mas_100_entrada[1:5,],row.names=FALSE)
+```
+
+**Dibuja el diagrama de densidad de distribución de los diferentes precios. Serían 5 gráficas, una por cada barrio.**
+
+```{r}
+#Pìntandolo en el mismo gráfico
+barrio_a_dibujar <- subset(airbnb_entire,Barrio %in% vector_100_entradas)
+ggplot(barrio_a_dibujar,aes(x=Precio,color=Barrio))+
+geom_density(na.rm = FALSE)
+```
+
+**Calcula el tamaño medio, en metros cuadrados, para los 5 barrios anteriores y muestralo en el mismo dataframe junto con el precio y número de entradas**
+
+```{r}
+barrios_por_metros_cuadrados_medio <- aggregate(MetrosCuadrados ~ Barrio, FUN = mean, data = airbnb_entire)
+barrio_resumen <- merge(barrio_resumen,barrios_por_metros_cuadrados_medio, by = "Barrio",all=TRUE)
+barrio_resumen$MetrosCuadrados <- round(barrio_resumen$MetrosCuadrados,2)
+```
+
+```{r}
+barrio_resumen_ <- subset(barrio_resumen, Barrio %in% vector_100_entradas)
+
+cat("Los barrios con más de 100 entradas junto a su precio medio y media de metros cuadrados:\n\n")
+barrio_resumen_
+```
+
+**Dibuja el diagrama de densidad de distribución de los diferentes tamaños de apartamentos. Serían 5 gráficas, una por cada barrio.**
+
+```{r}
+barrio_a_dibujar <- subset(airbnb_entire,Barrio %in% vector_100_entradas)
+ggplot(barrio_a_dibujar,aes(x=MetrosCuadrados,color=Barrio))+
+geom_density(na.rm = TRUE)
+```
+
+**Esta claro que las medias de metros cuadrados de cada uno de estos 5 barrios parecen ser diferentes, pero ¿son estadísticamente diferentes? ¿Que test habría que usar para comprobarlo?**
+
+Para comprobar si son estadísticamente significativas hay que hacer los siguientes pasos:
+
+Como tenemos 5 barrios , primero tenemos que comprobar si siguen una distribución gaussiana y para ello tenemos que realizarle a cada tipo de alquiler el Shapiro-Wilk. No podemos usar t de Student porque es solo para dos grupos.
+
+Las hipótesis que seguiremos para cada una de ellas será:
+
+\$H_0\$: La variable presenta una distribución normal
+
+\$H_1\$: La variable presenta una distribución no normal
+
+La decisión que tomaremos después de aplicar el test Shapiro será:
+
+p-valor \> 0.05 No rechazar H0 (El tipo de alquiler presenta una distribución normal)
+
+p-valor \< 0.05 Rechazar H0 (El tipo de alquiler no presenta una distribución normal)
+
+```{r}
+for(barrio in top_5_mayor_precio_mas_100_entrada[1:5,"Barrio"]){
+  metros_cuadrados <- airbnb_entire$Precio[airbnb_entire$Barrio==barrio]
+  if(length(metros_cuadrados)>5000){
+    metros_cuadrados<- sample(precios_alquiler,5000, replace = TRUE)
+  }
+  cat("Barrio ",barrio," p-value = " ,shapiro.test(metros_cuadrados)$p.value,"\n")
+}
+```
+
+Como el p valor es menor que 0.05 en los cinco casos se rechaza la hipótesis nula (H0), por lo tanto, la media de los metros cuadrados no sigue una distribución normal.
+
+Ya que sabemos que no siguen la misma distribución gaussiana procederemos a usar el test para aquellos grupos que no siguen la misma distribución y es el Kruskal-Wallis . No usaremos ANOVA test Welch porque no siguen una distribución gaussiana.
+
+Las hipótesis que seguiremos para cada una de ellas será:
+
+\$H_0\$: La media de los metros cuadrados por barrio tienen misma media.
+
+\$H_1\$: La media de los metros cuadrados por barrio tienen diferente media al menos unos de ellos.
+
+La decisión que tomaremos después de aplicar el test Shapiro será
+
+p-valor \> 0.05 No rechazar H0 (tomas las medias son similares)
+
+p-valor \< 0.05 Rechazar H0 (hay al menos una que no es similar a las demás)
+
+```{r}
+kruskal.test(MetrosCuadrados ~ Barrio, data=airbnb_entire)
+```
+
+Como el p-valor (0.02077) nos da inferior a 0.05 podemos rechazar la hipótesis nula H0 , por lo tanto, la media de los metros cuadrados por barrio hay al menos uno que no tiene la misma media.
+
+**Para únicamente los pisos de alquiler en el barrio de Sol:**
+
+**`barrio_sol<-subset(airbnb_entire,Barrio=="Sol")`**
+
+```{r}
+barrio_sol<-subset(airbnb_entire,Barrio=="Sol")
+```
+
+**Objetivo : Calcular un modelo lineal que combine alguna de estas variables: \* NumBanyos \* NumDormitorios \* MaxOcupantes \* MetrosCuadrados**
+
+Primero calculamos la correlación para ver como se relacionan estas variables entre sí.![]()
+
+Vamos a realizar la correlación entre todas las variables numéricas del dataset.
+
+```{r}
+variable_numericas <- c("MaxOcupantes","NumBanyos","NumDormitorios","NumCamas","Puntuacion","MetrosCuadrados","Precio")
+```
+
+```{r}
+round(cor(barrio_sol[variable_numericas],use="complete.obs"),2)
+```
+
+Observamos que la puntuación no tiene buena correlación con las demas por lo cual la eliminamos para los siguientes pasos.
+
+```{r}
+variable_numericas <- c("MaxOcupantes","NumBanyos","NumDormitorios","NumCamas","MetrosCuadrados","Precio")
+```
+
+**Se observa que la correlación entre el número de dormitorios y los metros cuadrados es sorprendentemente baja. ¿Son de fiar esos números?**
+
+Entre el número de dormitorios y los metros cuadrados se observa una correlación no muy alta 0.57 y usualmente debería ser mas correlacionada debido a que son variables que tienen mucha relación ( a mayor número de dormitorios mayor serán los metros cuadrados de este).
+
+**Mediante un histograma o curvas de densidad podemos descartar números que no tienen sentido en el dataframe barrio_sol, para tener una matriz de correlación que tenga mayor sentido.**
+
+```{r}
+datos <- na.omit(barrio_sol$MetrosCuadrados)
+hist(datos, breaks = seq(min(datos), max(datos) + 10, by = 10))
+```
+
+Mediante el histograma observamos que hay muchos datos que no son coherentes ( pisos con 0 metros cuadrados) . Por lo cual eliminaremos aquello con aquellos pisos de barrio del Sol que tienen al menos 30 metros cuadrados y que tendan valores omitidos.
+
+```{r}
+barrio_sol_modelo <- subset(barrio_sol,MetrosCuadrados >= 30)
+barrio_sol_modelo <- na.omit(barrio_sol_modelo)
+```
+
+Volvemo a realizar la correlación de los datos con la limpieza de datos en la columna "MetrosCuadrados"
+
+```{r}
+round(cor(barrio_sol[variable_numericas],use="complete.obs"),digits=2)
+```
+
+Como se puede comprobar en la nueva matriz de correlaciones la relación entre metros cuadrados y y número de dormitorios ha subido de 0.57 a 0.83 debido a la limpieza de datos hecha.
+
+**Una vez que hayamos filtrado los datos correspondientes calcular el valor o la combinación de valores que mejor nos permite obtener el precio de un inmueble.**
+
+```{r}
+model1<-lm(data=barrio_sol_modelo,formula = Precio~NumBanyos+NumCamas+NumDormitorios+MaxOcupantes+MetrosCuadrados)
+summary(model1)
+```
+
+Observamos que la variabla que nos aporta mayor p-valor es NumDormitorios y que por cada dormitorio mas el precio aumenta 31 € , seguida de número de baños , MaxOcupantes y MetrosCuadrados. Por último tenemos la variable Numcamas que nos resta valor al precio por cada una que tiene.
+
+Calculamos ahora otra vez el modelo lineal quitando las variables menos significaticas que en este caso sería NumCamas y MetrosCuadrados
+
+```{r}
+model2<-lm(data=barrio_sol_modelo,formula = Precio~NumBanyos+NumDormitorios+MaxOcupantes)
+summary(model2)
+```
+
+Con este nuevo modelo lineal con soló 3 variables tiene un R-squared un poco peor pero es lo normal debido a cómo funciona R y el Residual standard error ha bajado un poco.
+
+**¿Que variable es más fiable para conocer el precio de un inmueble, el número de habitaciones o los metros cuadrados?**
+
+Es más fiable la variable número de habitaciones respecto al de metros cuadrados debido a que en el primer modelo realizado el número de habitaciones incrementa el precio 31.48 € por cada una mientras que los metros cuadrados aumenta por cada uno 0.1523 € por cada uno. Esto también es debido que por cada unidad de número de habitaciones tiene mayor relevacia en el modelo que por cada unidad de metros cuadrados.
+
+Además el p-valor de número de habitaciones es de 0.00199 que es bastante significativo respecto al de metros cuadrados que es de 0.47210 que no aporta tanto valor.
+
+**Responde con su correspondiente margen de error del 95%, ¿cuantos euros incrementa el precio del alquiler por cada metro cuadrado extra del piso?**
+
+```{r}
+#Creamos el modelo lineal para el precio dependiendo de los metros cuadrados
+modelMetrosCuadrados<-lm(data=barrio_sol_modelo,formula = Precio ~ MetrosCuadrados)
+#Obtenemos el intervalo de confianza para el modelo anterior para el margen de error del 95%
+confintMetrosCuadrados <- confint(modelMetrosCuadrados,level = 0.95)
+```
+
+```{r}
+cat("El precio del alquiler aumenta",modelMetrosCuadrados$coefficients["MetrosCuadrados"],"por cada metro cuadrado extras del piso siguiendo un margen de erro del 95% el margen es: \n",
+"[",confintMetrosCuadrados["MetrosCuadrados","2.5 %"],",",
+confintMetrosCuadrados["MetrosCuadrados","97.5 %"],"]")
+```
+
+**Responde con su correspondiente margen de error del 95%, ¿cuantos euros incrementa el precio del alquiler por cada habitación?**
+
+```{r}
+#Creamos el modelo lineal para el precio dependiendo del numero de domitorios
+modelNumDormitorios<-lm(data=barrio_sol_modelo,formula = Precio ~ NumDormitorios)
+#Obtenemos el intervalo de confianza para el modelo anterior para el margen de error del 95%
+confintNumDormitorios <- confint(modelNumDormitorios,level = 0.95)
+```
+
+```{r}
+cat("El precio del alquiler aumenta",modelNumDormitorios$coefficients["NumDormitorios"],"por cada metro cuadrado extras del piso siguiendo un margen de erro del 95% el margen es: \n",
+"[",confintNumDormitorios["NumDormitorios","2.5 %"],",",
+confintNumDormitorios["NumDormitorios","97.5 %"],"]")
+```
+
+**¿Cual es la probabilidad de encontrar, en el barrio de Sol, un apartamento en alquiler con 3 dormitorios? ¿Cual es el intervalo de confianza de esa probabilidad?**
+
+```{r}
+#Numero de apartamentos en el Barrio de sol
+barrio_sol_apart <- nrow(barrio_sol)
+#Numero de apartamentos en el Barrio de sol con 3 dormtorios
+barrio_sol_3_dormitorios_apart <- nrow(subset(barrio_sol,NumDormitorios == 3))
+#Aplicamos la binomial con un nivel de confianza del 95%
+binomtest <- binom.test(barrio_sol_3_dormitorios_apart,barrio_sol_apart,conf.level=0.95)
+
+cat("La probabilidad de encontrar, en el barrio de Sol,\nun apartamento en alquiler con 3 habitaciones es\n",round(binomtest$estimate,4),"con un intervalo de confianza al ",attr(binomtest$conf.int, "conf.level")," es:\n","[",round(binomtest$conf.int[1],4),",",round(binomtest$conf.int[2],4),"]")
+
+```
