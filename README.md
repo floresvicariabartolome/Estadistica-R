@@ -1,2 +1,2 @@
-# ModuloEstadisticaKeepcoding
-Entrega módulo estadística Keepcoding 
+# Estadistica
+Estadística aplicado a datos de Airbnb usando R
